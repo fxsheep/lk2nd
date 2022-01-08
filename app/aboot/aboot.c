@@ -40,6 +40,7 @@
 
 #include <dev/flash.h>
 #include <dev/flash-ubi.h>
+#include <lib/elf.h>
 #include <lib/ptable.h>
 #include <dev/keys.h>
 #include <dev/fbcon.h>
@@ -2655,6 +2656,8 @@ void cmd_flash_mmc_img(const char *arg, void *data, unsigned sz)
 	char *sp;
 	uint8_t lun = 0;
 	bool lun_set = false;
+	elf_handle_t elf;
+	status_t elf_st;
 
 	token = strtok_r((char *)arg, ":", &sp);
 	pname = token;
@@ -2694,6 +2697,37 @@ void cmd_flash_mmc_img(const char *arg, void *data, unsigned sz)
 		}
 		else
 #endif
+
+		if (!strcmp(pname, "loadelf"))
+		{
+			dprintf(INFO, "Attempt to load an ELF image.\n");
+			elf_st = elf_open_handle_memory(&elf, data, sz);
+			if (elf_st < 0) {
+				dprintf(CRITICAL, "unable to open elf handle\n");
+				goto elf_open_fail;
+			}
+			elf_st = elf_load(&elf);
+			if (elf_st < 0) {
+				dprintf(CRITICAL, "elf processing failed, status : %d\n", elf_st);
+			}
+			else {
+				dprintf(INFO, "elf looks good\n");
+			}
+			elf_close_handle(&elf);
+
+elf_open_fail:
+			if (elf_st < 0) {
+				fastboot_fail("ELF load fail");
+				return;
+			}
+			else {
+				fastboot_info("ELF load success");
+				fastboot_okay("");
+				return;
+			}
+
+		}
+
 		{
 #if VERIFIED_BOOT
 			if(!strcmp(pname, KEYSTORE_PTN_NAME))
